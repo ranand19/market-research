@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environment
+.env
+.env.local
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# React / Node
+MarketResearchUI/node_modules/
+MarketResearchUI/build/
+MarketResearchUI/.env
+MarketResearchUI/.env.local
+MarketResearchUI/.env.production
+MarketResearchUI/npm-debug.log*
+MarketResearchUI/yarn-debug.log*
+MarketResearchUI/yarn-error.log*

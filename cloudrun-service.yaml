@@ -1,0 +1,53 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  annotations:
+    run.googleapis.com/ingress: all
+    run.googleapis.com/execution-environment: gen2
+  name: market-research-app
+spec:
+  template:
+    metadata:
+      annotations:
+        # Allow all traffic
+        run.googleapis.com/ingress: all
+        # Use gen2 execution environment for better performance
+        run.googleapis.com/execution-environment: gen2
+        # Set memory and CPU limits
+        run.googleapis.com/memory: 2Gi
+        run.googleapis.com/cpu: "2"
+        # Environment variables
+        run.googleapis.com/env-vars: |
+          OPENAI_API_KEY=from_secret
+          LLM_MODEL=gpt-4
+          LLM_TEMPERATURE=0.7
+          LLM_MAX_TOKENS=2000
+    spec:
+      containerConcurrency: 80
+      timeoutSeconds: 300
+      containers:
+      - image: gcr.io/PROJECT_ID/market-research-app:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: PORT
+          value: "8080"
+        resources:
+          limits:
+            memory: 2Gi
+            cpu: "2"
+          requests:
+            memory: 1Gi
+            cpu: "1"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5

@@ -1,0 +1,9 @@
+{
+  "short_name": "Market Research",
+  "name": "Market Research & Competitor Tracking",
+  "icons": [],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#003da5",
+  "background_color": "#ffffff"
+}
