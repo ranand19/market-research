@@ -84,16 +84,21 @@ class ResearchResponse(BaseModel):
 
 # Initialize LLM
 llm = None
-try:
-    llm = ChatOpenAI(
-        model="gpt-5",
-        temperature=0.7,
-        max_tokens=4000
-    )
-    logger.info("Successfully initialized LLM with gpt 5")
-except Exception as e:
-    logger.warning(f"OpenAI initialization warning: {e}")
-    llm = None
+api_key = os.environ.get("OPENAI_API_KEY")
+if not api_key:
+    logger.warning("OPENAI_API_KEY not set in environment. LLM will be unavailable.")
+else:
+    try:
+        llm = ChatOpenAI(
+            model=os.environ.get("LLM_MODEL", "gpt-5"),
+            temperature=float(os.environ.get("LLM_TEMPERATURE", "0.7")),
+            max_tokens=int(os.environ.get("LLM_MAX_TOKENS", "4000")),
+            api_key=api_key,
+        )
+        logger.info(f"Successfully initialized LLM with {os.environ.get('LLM_MODEL', 'gpt-5')}")
+    except Exception as e:
+        logger.warning(f"OpenAI initialization warning: {e}")
+        llm = None
 
 
 # =============================================================================

@@ -27,7 +27,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY api_backend.py .
 COPY agents/ ./agents/
 COPY tools/ ./tools/
-COPY .env .env.example
+COPY .env.example .env.example
 
 # Copy the built frontend from the previous stage
 COPY --from=frontend-build /app/frontend/build ./static
