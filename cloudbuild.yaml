@@ -33,7 +33,7 @@ steps:
     - '--set-env-vars'
     - 'LLM_MODEL=gpt-4,LLM_TEMPERATURE=0.7,LLM_MAX_TOKENS=2000'
     - '--update-secrets'
-    - 'OPENAI_API_KEY=openai-api-key:latest'
+    - 'OPENAI_API_KEY=openai-api-key:latest,TAVILY_API_KEY=tavily-api-key:latest'
 
 # Store the image for future reference
 images:

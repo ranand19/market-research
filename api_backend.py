@@ -95,6 +95,13 @@ else:
         logger.warning(f"OpenAI initialization warning: {e}")
         llm = None
 
+# Check for Tavily API key
+tavily_key = os.environ.get("TAVILY_API_KEY")
+if not tavily_key:
+    logger.warning("TAVILY_API_KEY not set in environment. Web search will be unavailable.")
+else:
+    logger.info("TAVILY_API_KEY is configured.")
+
 
 # =============================================================================
 # API ENDPOINTS
@@ -110,6 +117,7 @@ async def health_check():
         "architecture": "multi-agent",
         "timestamp": datetime.now().isoformat(),
         "llm_available": llm is not None,
+        "tavily_available": bool(os.environ.get("TAVILY_API_KEY")),
         "agents": ["research", "analysis", "strategy"]
     }
 
