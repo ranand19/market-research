@@ -44,7 +44,7 @@ app.add_middleware(
 # Check if static directory exists (for production deployment)
 static_dir = Path("static")
 if static_dir.exists():
-    app.mount("/static", StaticFiles(directory="static", html=True), name="static")
+    app.mount("/static", StaticFiles(directory="static/static"), name="static")
 
     @app.get("/")
     async def serve_frontend():
