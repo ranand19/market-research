@@ -4,13 +4,27 @@ Uses DuckDuckGo for free, real-time web search capabilities.
 """
 
 import logging
+import time
 from typing import List, Dict, Any
 from duckduckgo_search import DDGS
 
 logger = logging.getLogger(__name__)
 
+# Shared delay to avoid DuckDuckGo rate-limiting across back-to-back calls
+_SEARCH_DELAY = 1.5  # seconds between DDG requests
+_last_search_time = 0.0
 
-def web_search(query: str, max_results: int = 10) -> List[Dict[str, Any]]:
+
+def _rate_limit():
+    """Enforce a minimum delay between DuckDuckGo requests."""
+    global _last_search_time
+    elapsed = time.time() - _last_search_time
+    if elapsed < _SEARCH_DELAY:
+        time.sleep(_SEARCH_DELAY - elapsed)
+    _last_search_time = time.time()
+
+
+def web_search(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
     """
     Search the web for general information.
 
@@ -22,27 +36,39 @@ def web_search(query: str, max_results: int = 10) -> List[Dict[str, Any]]:
         List of search results with title, link, and snippet
     """
     logger.info(f"Web search: {query}")
-    try:
-        with DDGS() as ddgs:
-            results = list(ddgs.text(query, max_results=max_results))
+    for attempt in range(3):
+        try:
+            _rate_limit()
+            with DDGS() as ddgs:
+                results = list(ddgs.text(query, max_results=max_results))
 
-        formatted_results = []
-        for r in results:
-            formatted_results.append({
-                "title": r.get("title", ""),
-                "url": r.get("href", ""),
-                "snippet": r.get("body", ""),
-                "source": "web_search"
-            })
+            if not results and attempt < 2:
+                logger.warning(f"Web search returned 0 results (attempt {attempt + 1}), retrying...")
+                time.sleep(2 ** attempt)
+                continue
 
-        logger.info(f"Found {len(formatted_results)} web results")
-        return formatted_results
-    except Exception as e:
-        logger.error(f"Web search failed: {e}")
-        return [{"error": str(e), "source": "web_search"}]
+            formatted_results = []
+            for r in results:
+                formatted_results.append({
+                    "title": r.get("title", ""),
+                    "url": r.get("href", ""),
+                    "snippet": r.get("body", ""),
+                    "source": "web_search"
+                })
+
+            logger.info(f"Found {len(formatted_results)} web results")
+            return formatted_results
+        except Exception as e:
+            logger.error(f"Web search failed (attempt {attempt + 1}): {e}")
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+                continue
+            return [{"error": str(e), "source": "web_search"}]
+
+    return [{"error": "Search returned no results after retries", "source": "web_search"}]
 
 
-def news_search(query: str, max_results: int = 10) -> List[Dict[str, Any]]:
+def news_search(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
     """
     Search for recent news articles.
 
@@ -54,59 +80,59 @@ def news_search(query: str, max_results: int = 10) -> List[Dict[str, Any]]:
         List of news articles with title, link, snippet, and date
     """
     logger.info(f"News search: {query}")
-    try:
-        with DDGS() as ddgs:
-            results = list(ddgs.news(query, max_results=max_results))
+    for attempt in range(3):
+        try:
+            _rate_limit()
+            with DDGS() as ddgs:
+                results = list(ddgs.news(query, max_results=max_results))
 
-        formatted_results = []
-        for r in results:
-            formatted_results.append({
-                "title": r.get("title", ""),
-                "url": r.get("url", ""),
-                "snippet": r.get("body", ""),
-                "date": r.get("date", ""),
-                "source": r.get("source", ""),
-                "type": "news"
-            })
+            if not results and attempt < 2:
+                logger.warning(f"News search returned 0 results (attempt {attempt + 1}), retrying...")
+                time.sleep(2 ** attempt)
+                continue
 
-        logger.info(f"Found {len(formatted_results)} news results")
-        return formatted_results
-    except Exception as e:
-        logger.error(f"News search failed: {e}")
-        return [{"error": str(e), "source": "news_search"}]
+            formatted_results = []
+            for r in results:
+                formatted_results.append({
+                    "title": r.get("title", ""),
+                    "url": r.get("url", ""),
+                    "snippet": r.get("body", ""),
+                    "date": r.get("date", ""),
+                    "source": r.get("source", ""),
+                    "type": "news"
+                })
+
+            logger.info(f"Found {len(formatted_results)} news results")
+            return formatted_results
+        except Exception as e:
+            logger.error(f"News search failed (attempt {attempt + 1}): {e}")
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+                continue
+            return [{"error": str(e), "source": "news_search"}]
+
+    return [{"error": "News search returned no results after retries", "source": "news_search"}]
 
 
 def company_search(company_name: str) -> List[Dict[str, Any]]:
     """
-    Search for company-specific information including financials, news, and overview.
+    Search for company-specific information including overview and recent news.
 
     Args:
         company_name: Name of the company to research
 
     Returns:
-        Combined results from multiple searches about the company
+        Combined results from searches about the company
     """
     logger.info(f"Company search: {company_name}")
 
-    results = []
-
-    # Search for company overview
-    overview_results = web_search(f"{company_name} company overview profile", max_results=5)
-    for r in overview_results:
+    # Single broad search to minimize DDG calls
+    results = web_search(
+        f"{company_name} company overview market share revenue 2024 2025",
+        max_results=5,
+    )
+    for r in results:
         r["category"] = "overview"
-    results.extend(overview_results)
-
-    # Search for recent news
-    news_results = news_search(f"{company_name} company", max_results=5)
-    for r in news_results:
-        r["category"] = "news"
-    results.extend(news_results)
-
-    # Search for financial/market info
-    financial_results = web_search(f"{company_name} market share revenue financials", max_results=5)
-    for r in financial_results:
-        r["category"] = "financial"
-    results.extend(financial_results)
 
     logger.info(f"Found {len(results)} total results for {company_name}")
     return results
@@ -125,17 +151,12 @@ def market_search(industry: str, topic: str = "market size trends") -> List[Dict
     """
     logger.info(f"Market search: {industry} - {topic}")
 
+    # Single broad search to minimize DDG calls
     query = f"{industry} {topic} 2024 2025"
-    results = web_search(query, max_results=10)
-
-    # Also get recent news
-    news_results = news_search(f"{industry} market", max_results=5)
+    results = web_search(query, max_results=5)
 
     for r in results:
         r["category"] = "market_data"
-    for r in news_results:
-        r["category"] = "market_news"
 
-    all_results = results + news_results
-    logger.info(f"Found {len(all_results)} market results")
-    return all_results
+    logger.info(f"Found {len(results)} market results")
+    return results
