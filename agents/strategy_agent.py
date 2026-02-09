@@ -410,7 +410,7 @@ Use ALL strategy tools:
 Focus on the 3-4 most impactful tools for a complete strategic perspective."""
 
     try:
-        invoke_config = {"recursion_limit": 10}
+        invoke_config = {"recursion_limit": 25}
         if callbacks:
             invoke_config["callbacks"] = callbacks
         result = agent.invoke(

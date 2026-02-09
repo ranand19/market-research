@@ -192,7 +192,7 @@ This is for a comprehensive report. Perform 3-4 focused searches covering the ke
 
     try:
         # Run the agent
-        invoke_config = {"recursion_limit": 10}
+        invoke_config = {"recursion_limit": 25}
         if callbacks:
             invoke_config["callbacks"] = callbacks
         result = agent.invoke(
@@ -208,16 +208,28 @@ This is for a comprehensive report. Perform 3-4 focused searches covering the ke
             # Check for tool messages (results from tool calls)
             if hasattr(message, 'content') and message.type == "tool":
                 try:
-                    # Try to parse the tool result
-                    import ast
-                    parsed = ast.literal_eval(message.content)
+                    # Try JSON first (tool results use true/false/null),
+                    # fall back to ast.literal_eval for Python literals
+                    import json as _json
+                    parsed = _json.loads(message.content)
                     if isinstance(parsed, list):
                         all_results.extend(parsed)
                     else:
                         all_results.append(parsed)
                     tool_calls += 1
-                except:
-                    pass
+                except (ValueError, TypeError):
+                    try:
+                        import ast
+                        parsed = ast.literal_eval(message.content)
+                        if isinstance(parsed, list):
+                            all_results.extend(parsed)
+                        else:
+                            all_results.append(parsed)
+                        tool_calls += 1
+                    except (ValueError, SyntaxError):
+                        # Store raw content so results aren't silently dropped
+                        all_results.append({"raw": message.content})
+                        tool_calls += 1
 
         # Get the final agent response
         final_message = result["messages"][-1] if result.get("messages") else None
