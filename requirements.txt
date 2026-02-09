@@ -21,7 +21,7 @@ pydantic>=2.9.0
 python-dotenv>=1.0.0
 
 # Web Search
-duckduckgo-search>=6.0.0
+tavily-python>=0.5.0
 
 # Utilities
 requests>=2.31.0

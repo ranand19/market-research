@@ -28,7 +28,7 @@ def search_web(query: str) -> str:
     Args:
         query: The search query string
     """
-    results = web_search(query, max_results=10)
+    results = web_search(query, max_results=5)
     return str(results)
 
 
@@ -40,7 +40,7 @@ def search_news(query: str) -> str:
     Args:
         query: The search query string
     """
-    results = news_search(query, max_results=10)
+    results = news_search(query, max_results=5)
     return str(results)
 
 
@@ -206,17 +206,15 @@ Make exactly 3 tool calls: search_market, search_company, and search_web. Then g
 
         logger.info(f"Research agent extracted {tool_calls} tool results, {len(all_results)} data items")
 
-        # Guard: if agent ran but produced no results, report an error
-        if not all_results:
-            logger.warning("Research agent returned no search results")
-            return {
-                "query": query,
-                "research_type": research_type,
-                "error": "Research agent produced no results. The LLM may not have called any tools.",
-                "search_results": [],
-                "agent_output": agent_output,
-                "num_searches": 0,
-            }
+        # Fallback: if no tool results were captured, use the LLM's own
+        # text response so the downstream agents still have data to work with.
+        if not all_results and agent_output:
+            logger.warning("No tool results captured — using LLM text response as fallback data")
+            all_results.append({
+                "title": f"Research summary: {query}",
+                "snippet": agent_output,
+                "source": "llm_knowledge",
+            })
 
         return {
             "query": query,
