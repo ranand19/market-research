@@ -51,13 +51,6 @@ if static_dir.exists():
         """Serve React frontend"""
         return FileResponse("static/index.html")
 
-    @app.get("/{path:path}")
-    async def serve_frontend_routes(path: str):
-        """Serve React frontend for all non-API routes"""
-        if path.startswith("research/") or path.startswith("tools/") or path.startswith("health"):
-            raise HTTPException(status_code=404, detail="API endpoint not found")
-        return FileResponse("static/index.html")
-
 
 # Request/Response models
 class ResearchRequest(BaseModel):
@@ -283,6 +276,14 @@ async def list_tools():
             }
         ]
     }
+
+
+# Catch-all route for React frontend (must be registered AFTER all API routes)
+if static_dir.exists():
+    @app.get("/{path:path}")
+    async def serve_frontend_routes(path: str):
+        """Serve React frontend for all non-API routes"""
+        return FileResponse("static/index.html")
 
 
 if __name__ == "__main__":
