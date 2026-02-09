@@ -166,15 +166,22 @@ Make exactly 3 tool calls: search_market, search_company, and search_web. Then g
         # Extract search results from the messages
         all_results = []
         tool_calls = 0
+        messages = result.get("messages", [])
 
-        for message in result.get("messages", []):
-            # Check for tool messages (results from tool calls)
-            if hasattr(message, 'content') and message.type == "tool":
+        # Log message types for debugging
+        msg_types = [getattr(m, 'type', type(m).__name__) for m in messages]
+        logger.info(f"Research agent returned {len(messages)} messages: {msg_types}")
+
+        for message in messages:
+            msg_type = getattr(message, 'type', None)
+            # Accept tool messages (ToolMessage) by type or class name
+            if msg_type == "tool" or type(message).__name__ == "ToolMessage":
+                content = getattr(message, 'content', '')
+                if not content:
+                    continue
                 try:
-                    # Try JSON first (tool results use true/false/null),
-                    # fall back to ast.literal_eval for Python literals
                     import json as _json
-                    parsed = _json.loads(message.content)
+                    parsed = _json.loads(content)
                     if isinstance(parsed, list):
                         all_results.extend(parsed)
                     else:
@@ -183,20 +190,33 @@ Make exactly 3 tool calls: search_market, search_company, and search_web. Then g
                 except (ValueError, TypeError):
                     try:
                         import ast
-                        parsed = ast.literal_eval(message.content)
+                        parsed = ast.literal_eval(content)
                         if isinstance(parsed, list):
                             all_results.extend(parsed)
                         else:
                             all_results.append(parsed)
                         tool_calls += 1
                     except (ValueError, SyntaxError):
-                        # Store raw content so results aren't silently dropped
-                        all_results.append({"raw": message.content})
+                        all_results.append({"raw": content})
                         tool_calls += 1
 
         # Get the final agent response
-        final_message = result["messages"][-1] if result.get("messages") else None
-        agent_output = final_message.content if final_message else ""
+        final_message = messages[-1] if messages else None
+        agent_output = getattr(final_message, 'content', '') if final_message else ""
+
+        logger.info(f"Research agent extracted {tool_calls} tool results, {len(all_results)} data items")
+
+        # Guard: if agent ran but produced no results, report an error
+        if not all_results:
+            logger.warning("Research agent returned no search results")
+            return {
+                "query": query,
+                "research_type": research_type,
+                "error": "Research agent produced no results. The LLM may not have called any tools.",
+                "search_results": [],
+                "agent_output": agent_output,
+                "num_searches": 0,
+            }
 
         return {
             "query": query,
