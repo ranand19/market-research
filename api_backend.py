@@ -187,58 +187,15 @@ async def stream_research(request: ResearchRequest):
         )
 
     research_id = f"research_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     queue: asyncio.Queue = asyncio.Queue()
 
     def progress_callback(event: dict):
         """Push progress events onto the async queue (thread-safe)."""
         loop.call_soon_threadsafe(queue.put_nowait, event)
 
-    async def event_generator():
-        """Yield SSE events from the queue, then the final result."""
-        from agents.orchestrator import run_research
-
-        # Run the blocking workflow in a thread so it doesn't block the event loop
-        result_future = loop.run_in_executor(
-            None,
-            lambda: run_research(
-                llm=llm,
-                query=request.query,
-                research_type=request.research_type,
-                company=request.company_name,
-                competitors=request.competitors,
-                industry=request.industry,
-                progress_callback=progress_callback,
-            ),
-        )
-
-        # Drain progress events from the queue while the workflow runs
-        while True:
-            try:
-                event = await asyncio.wait_for(queue.get(), timeout=0.5)
-                yield f"data: {json.dumps(event)}\n\n"
-            except asyncio.TimeoutError:
-                # Check if the workflow has finished
-                if result_future.done():
-                    # Drain any remaining events
-                    while not queue.empty():
-                        event = queue.get_nowait()
-                        yield f"data: {json.dumps(event)}\n\n"
-                    break
-
-        # Get the final result (handle errors gracefully)
-        try:
-            result = result_future.result()
-        except Exception as e:
-            logger.error(f"Streaming workflow failed: {e}")
-            result = {
-                "status": "failed",
-                "error": str(e),
-                "results": {},
-                "summary": f"Research failed: {str(e)}",
-            }
-
-        # Send final result event
+    def _build_final_event(result: dict) -> str:
+        """Build the final SSE payload, falling back on serialization errors."""
         final_event = {
             "agent": "complete",
             "status": "done",
@@ -252,7 +209,64 @@ async def stream_research(request: ResearchRequest):
                 "workflow_trace": result.get("workflow_trace"),
             },
         }
-        yield f"data: {json.dumps(final_event)}\n\n"
+        # default=str handles any non-serializable objects (LangChain messages, etc.)
+        return f"data: {json.dumps(final_event, default=str)}\n\n"
+
+    async def event_generator():
+        """Yield SSE events from the queue, then the final result."""
+        from agents.orchestrator import run_research
+
+        try:
+            # Run the blocking workflow in a thread so it doesn't block the event loop
+            result_future = loop.run_in_executor(
+                None,
+                lambda: run_research(
+                    llm=llm,
+                    query=request.query,
+                    research_type=request.research_type,
+                    company=request.company_name,
+                    competitors=request.competitors,
+                    industry=request.industry,
+                    progress_callback=progress_callback,
+                ),
+            )
+
+            # Drain progress events from the queue while the workflow runs
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=0.5)
+                    yield f"data: {json.dumps(event, default=str)}\n\n"
+                except asyncio.TimeoutError:
+                    # Check if the workflow has finished
+                    if result_future.done():
+                        # Drain any remaining events
+                        while not queue.empty():
+                            event = queue.get_nowait()
+                            yield f"data: {json.dumps(event, default=str)}\n\n"
+                        break
+
+            # Get the final result (handle errors gracefully)
+            try:
+                result = result_future.result()
+            except Exception as e:
+                logger.error(f"Streaming workflow failed: {e}")
+                result = {
+                    "status": "failed",
+                    "error": str(e),
+                    "results": {},
+                    "summary": f"Research failed: {str(e)}",
+                }
+
+            yield _build_final_event(result)
+
+        except Exception as e:
+            # Last-resort: always send a final event so the frontend never hangs
+            logger.error(f"Stream generator error: {e}")
+            yield _build_final_event({
+                "status": "failed",
+                "results": {},
+                "summary": f"Research failed: {str(e)}",
+            })
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 

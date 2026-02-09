@@ -323,14 +323,7 @@ def create_analysis_agent(llm):
 
     system_prompt = """You are an expert market analyst. Your job is to analyze research data and produce comprehensive insights.
 
-You have access to several analysis tools. Based on the research type and data available, decide which analyses to perform:
-
-- For MARKET OVERVIEW: Use analyze_market_size, analyze_market_segments, identify_trends, extract_key_statistics
-- For COMPETITOR ANALYSIS: Use analyze_competitive_landscape, perform_swot_analysis, extract_key_statistics
-- For TREND ANALYSIS: Use identify_trends, analyze_market_segments, extract_key_statistics
-- For FULL REPORT: Use ALL available tools to build a comprehensive picture
-
-Run 2-3 of the most relevant analyses. Actually USE the tools."""
+IMPORTANT: You MUST make only 2-3 total tool calls, then immediately provide your final answer. Do NOT make more than 3 tool calls. Pick the 2-3 most relevant analysis tools for the research type."""
 
     agent = create_react_agent(llm, tools, prompt=system_prompt)
     return agent
@@ -370,46 +363,28 @@ def run_analysis_agent(llm, research_data: Dict[str, Any], research_type: str,
         prompt = f"""Analyze the research data for a MARKET OVERVIEW of: {query}
 Industry: {industry or 'General'}
 
-Perform comprehensive market analysis:
-1. Use analyze_market_size to understand market size and growth
-2. Use analyze_market_segments to identify key segments
-3. Use identify_trends to find emerging trends
-4. Use extract_key_statistics for important data points"""
+Make exactly 2 tool calls: analyze_market_size and identify_trends. Then give your final answer."""
 
     elif research_type == "competitor_analysis":
         prompt = f"""Analyze the research data for COMPETITOR ANALYSIS of: {company or query}
 Competitors: {', '.join(competitors) if competitors else 'Identify from data'}
 
-Perform comprehensive competitive analysis:
-1. Use analyze_competitive_landscape to map competitors
-2. Use perform_swot_analysis for strategic assessment
-3. Use extract_key_statistics for market shares"""
+Make exactly 2 tool calls: analyze_competitive_landscape and perform_swot_analysis. Then give your final answer."""
 
     elif research_type == "trend_analysis":
         prompt = f"""Analyze the research data for TREND ANALYSIS in: {industry or query}
 
-Perform comprehensive trend analysis:
-1. Use identify_trends to find emerging trends
-2. Use analyze_market_segments for segment trends
-3. Use extract_key_statistics for supporting data"""
+Make exactly 2 tool calls: identify_trends and extract_key_statistics. Then give your final answer."""
 
     else:  # full_report
-        prompt = f"""Analyze the research data for a FULL COMPREHENSIVE REPORT on: {query}
+        prompt = f"""Analyze the research data for a FULL REPORT on: {query}
 Company: {company or 'N/A'}
 Industry: {industry or 'General'}
 
-Use ALL available analysis tools:
-1. analyze_market_size
-2. analyze_market_segments
-3. analyze_competitive_landscape
-4. perform_swot_analysis
-5. identify_trends
-6. extract_key_statistics
-
-Focus on the 3-4 most important tools for a comprehensive picture."""
+Make exactly 3 tool calls: analyze_market_size, analyze_competitive_landscape, and identify_trends. Then give your final answer."""
 
     try:
-        invoke_config = {"recursion_limit": 25}
+        invoke_config = {"recursion_limit": 12}
         if callbacks:
             invoke_config["callbacks"] = callbacks
         result = agent.invoke(

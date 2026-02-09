@@ -327,19 +327,7 @@ def create_strategy_agent(llm):
 
     system_prompt = """You are a senior strategy consultant at a top-tier consulting firm.
 
-You have access to several strategy tools. Based on the research type, decide which outputs to generate:
-
-- For MARKET OVERVIEW: Generate recommendations, identify opportunities, create executive summary
-- For COMPETITOR ANALYSIS: Assess risks, develop competitive response strategy, generate recommendations
-- For TREND ANALYSIS: Identify opportunities, generate recommendations, create executive summary
-- For FULL REPORT: Use ALL tools to provide comprehensive strategic guidance
-
-Always:
-1. Generate an executive summary (clients always need this)
-2. Provide actionable recommendations
-3. Address both opportunities and risks
-
-Be strategic and insightful. Use 2-3 of the most relevant tools."""
+IMPORTANT: You MUST make only 2-3 total tool calls, then immediately provide your final answer. Do NOT make more than 3 tool calls. Always include generate_executive_summary as one of your calls."""
 
     agent = create_react_agent(llm, tools, prompt=system_prompt)
     return agent
@@ -374,43 +362,25 @@ def run_strategy_agent(llm, analysis_data: Dict[str, Any], query: str,
     if research_type == "market_overview":
         prompt = f"""Based on the market analysis for "{query}", develop strategic guidance.
 
-Generate:
-1. Use generate_strategic_recommendations for market participation
-2. Use identify_opportunities for growth opportunities
-3. Use generate_executive_summary for findings overview"""
+Make exactly 2 tool calls: generate_strategic_recommendations and generate_executive_summary. Then give your final answer."""
 
     elif research_type == "competitor_analysis":
         prompt = f"""Based on the competitive analysis for "{company or query}", develop strategic guidance.
 
-Generate:
-1. Use assess_risks for competitive threats
-2. Use competitive_response_strategy for response plans
-3. Use generate_strategic_recommendations
-4. Use generate_executive_summary"""
+Make exactly 2 tool calls: assess_risks and generate_executive_summary. Then give your final answer."""
 
     elif research_type == "trend_analysis":
         prompt = f"""Based on the trend analysis for "{query}", develop strategic guidance.
 
-Generate:
-1. Use identify_opportunities from trends
-2. Use generate_strategic_recommendations for trend response
-3. Use generate_executive_summary"""
+Make exactly 2 tool calls: identify_opportunities and generate_executive_summary. Then give your final answer."""
 
     else:  # full_report
         prompt = f"""Based on the comprehensive analysis for "{query}", develop full strategic guidance.
 
-Use ALL strategy tools:
-1. generate_strategic_recommendations
-2. assess_risks
-3. identify_opportunities
-4. competitive_response_strategy
-5. create_action_plan
-6. generate_executive_summary
-
-Focus on the 3-4 most impactful tools for a complete strategic perspective."""
+Make exactly 3 tool calls: generate_strategic_recommendations, assess_risks, and generate_executive_summary. Then give your final answer."""
 
     try:
-        invoke_config = {"recursion_limit": 25}
+        invoke_config = {"recursion_limit": 12}
         if callbacks:
             invoke_config["callbacks"] = callbacks
         result = agent.invoke(

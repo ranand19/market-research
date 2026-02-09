@@ -96,24 +96,9 @@ def create_research_agent(llm):
 
     system_prompt = """You are an expert research analyst specializing in gathering market intelligence.
 
-Your role is to:
-1. Search for relevant, current information using the available tools
-2. Gather comprehensive data from multiple sources
-3. Focus on finding concrete data points: market size, growth rates, key players, trends
-4. Use multiple searches to build a complete picture
+Your role is to search for relevant, current information and find concrete data points: market size, growth rates, key players, trends.
 
-For market research:
-- Search for market size and growth data using search_market
-- Search for key industry trends using search_web
-- Search for major players and competitors using search_company
-- Search for recent news and developments using search_news
-
-For competitor analysis:
-- Search for each competitor individually using search_company
-- Look for market share data using search_web
-- Find recent news about competitors using search_news
-
-Be focused and efficient. Perform 2-3 targeted searches to gather the most important data."""
+IMPORTANT: You MUST make only 2-3 total tool calls, then immediately provide your final answer. Do NOT make more than 3 tool calls under any circumstances. Pick the 2-3 most impactful searches and combine results."""
 
     agent = create_react_agent(llm, tools, prompt=system_prompt)
     return agent
@@ -142,14 +127,10 @@ def run_research_agent(llm, query: str, research_type: str, company: str = None,
 
     # Build the research prompt based on type
     if research_type == "market_overview":
-        prompt = f"""Conduct comprehensive market research on: {query}
+        prompt = f"""Conduct market research on: {query}
 Industry: {industry or 'General'}
 
-Please gather data by:
-1. Use search_market to find market size and growth data
-2. Use search_news to find recent market developments
-3. Use search_web to find industry trends and key players
-Keep it to 2-3 key searches for the most relevant data."""
+Make exactly 2 tool calls: one search_market and one search_web. Then give your final answer."""
 
     elif research_type == "competitor_analysis":
         competitor_list = ", ".join(competitors) if competitors else "major competitors"
@@ -157,42 +138,24 @@ Keep it to 2-3 key searches for the most relevant data."""
 Competitors to analyze: {competitor_list}
 Industry: {industry or 'General'}
 
-Please gather data by:
-1. Use search_company for {company or 'the main company'}
-2. Use search_company for each major competitor
-3. Use search_web to find market share data
-4. Use search_news for recent competitive news
-
-Focus on 2-3 searches for the most important competitive data."""
+Make exactly 2 tool calls: one search_company and one search_web. Then give your final answer."""
 
     elif research_type == "trend_analysis":
         prompt = f"""Analyze emerging trends in: {industry or query}
 
-Please gather data by:
-1. Use search_market to find current industry trends
-2. Use search_web to find technology and innovation trends
-3. Use search_news for recent industry changes
-4. Use search_web to find future predictions and forecasts
-
-Perform 2-3 focused searches to identify the key trends."""
+Make exactly 2 tool calls: one search_market and one search_news. Then give your final answer."""
 
     else:  # full_report
-        prompt = f"""Conduct comprehensive market research for a full report on: {query}
+        prompt = f"""Conduct market research for a full report on: {query}
 Company: {company or 'N/A'}
 Industry: {industry or 'General'}
 Competitors: {', '.join(competitors) if competitors else 'To be identified'}
 
-Gather data for:
-1. Market overview - size, growth, segments (use search_market)
-2. Competitive landscape - key players (use search_company)
-3. Industry trends - current and emerging (use search_web)
-4. Recent developments and news (use search_news)
-
-This is for a comprehensive report. Perform 3-4 focused searches covering the key areas."""
+Make exactly 3 tool calls: search_market, search_company, and search_web. Then give your final answer."""
 
     try:
         # Run the agent
-        invoke_config = {"recursion_limit": 25}
+        invoke_config = {"recursion_limit": 12}
         if callbacks:
             invoke_config["callbacks"] = callbacks
         result = agent.invoke(

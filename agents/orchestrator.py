@@ -43,7 +43,7 @@ class ResearchState(TypedDict):
 class IterationProgressHandler(BaseCallbackHandler):
     """LangChain callback handler that reports tool-call progress."""
 
-    def __init__(self, agent_name: str, callback: Callable, max_iterations: int = 5):
+    def __init__(self, agent_name: str, callback: Callable, max_iterations: int = 3):
         self.agent_name = agent_name
         self.callback = callback
         self.iteration = 0
