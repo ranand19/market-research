@@ -7,7 +7,7 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 60000, // 60 seconds for complex research queries
+  timeout: 300000, // 5 minutes for complex multi-agent research queries
 });
 
 // API service methods
@@ -54,6 +54,60 @@ const apiService = {
       console.error('Research execution failed:', error);
       throw error;
     }
+  },
+
+  // Execute research with SSE streaming progress updates
+  streamResearch: async (researchData, onProgress) => {
+    const url = `${API_BASE_URL}/research/stream`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(researchData),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(errorBody || `Stream request failed: ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalResult = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Parse SSE lines from the buffer
+      const lines = buffer.split('\n');
+      // Keep the last potentially-incomplete line in the buffer
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+
+        try {
+          const event = JSON.parse(trimmed.slice(5).trim());
+          if (event.status === 'done' && event.result) {
+            finalResult = event.result;
+          }
+          if (onProgress) {
+            onProgress(event);
+          }
+        } catch (e) {
+          console.warn('Failed to parse SSE event:', trimmed, e);
+        }
+      }
+    }
+
+    if (!finalResult) {
+      throw new Error('Stream ended without a final result');
+    }
+    return finalResult;
   },
 };
 

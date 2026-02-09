@@ -6,9 +6,11 @@ Powered by Multi-Agent System with LangGraph for intelligent market analysis
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
+import asyncio
+import json
 import logging
 from datetime import datetime
 import os
@@ -168,6 +170,82 @@ async def execute_research(request: ResearchRequest):
     except Exception as e:
         logger.error(f"Research execution failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Research execution failed: {str(e)}")
+
+
+@app.post("/research/stream")
+async def stream_research(request: ResearchRequest):
+    """
+    Execute market research with SSE streaming progress updates.
+
+    Streams progress events as each agent starts/completes, then sends
+    the final result. Uses text/event-stream format.
+    """
+    if not llm:
+        raise HTTPException(
+            status_code=503,
+            detail="LLM not available. Please check OPENAI_API_KEY."
+        )
+
+    research_id = f"research_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    queue: asyncio.Queue = asyncio.Queue()
+
+    def progress_callback(event: dict):
+        """Push progress events onto the async queue (thread-safe)."""
+        queue.put_nowait(event)
+
+    async def event_generator():
+        """Yield SSE events from the queue, then the final result."""
+        from agents.orchestrator import run_research
+
+        # Run the blocking workflow in a thread so it doesn't block the event loop
+        loop = asyncio.get_event_loop()
+        result_future = loop.run_in_executor(
+            None,
+            lambda: run_research(
+                llm=llm,
+                query=request.query,
+                research_type=request.research_type,
+                company=request.company_name,
+                competitors=request.competitors,
+                industry=request.industry,
+                progress_callback=progress_callback,
+            ),
+        )
+
+        # Drain progress events from the queue while the workflow runs
+        while True:
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=0.5)
+                yield f"data: {json.dumps(event)}\n\n"
+            except asyncio.TimeoutError:
+                # Check if the workflow has finished
+                if result_future.done():
+                    # Drain any remaining events
+                    while not queue.empty():
+                        event = queue.get_nowait()
+                        yield f"data: {json.dumps(event)}\n\n"
+                    break
+
+        # Get the final result
+        result = await asyncio.wrap_future(result_future) if not result_future.done() else result_future.result()
+
+        # Send final result event
+        final_event = {
+            "agent": "complete",
+            "status": "done",
+            "result": {
+                "research_id": research_id,
+                "status": result.get("status", "completed"),
+                "research_type": request.research_type,
+                "results": result.get("results", {}),
+                "timestamp": datetime.now().isoformat(),
+                "summary": result.get("summary", "Research complete."),
+                "workflow_trace": result.get("workflow_trace"),
+            },
+        }
+        yield f"data: {json.dumps(final_event)}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 @app.get("/research/types")

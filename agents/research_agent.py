@@ -113,7 +113,7 @@ For competitor analysis:
 - Look for market share data using search_web
 - Find recent news about competitors using search_news
 
-Be thorough but focused. Perform 4-6 searches to gather comprehensive data."""
+Be focused and efficient. Perform 2-3 targeted searches to gather the most important data."""
 
     agent = create_react_agent(llm, tools, prompt=system_prompt)
     return agent
@@ -148,7 +148,7 @@ Please gather data by:
 1. Use search_market to find market size and growth data
 2. Use search_news to find recent market developments
 3. Use search_web to find industry trends and key players
-4. Perform at least 4 different searches to build a complete picture."""
+Keep it to 2-3 key searches for the most relevant data."""
 
     elif research_type == "competitor_analysis":
         competitor_list = ", ".join(competitors) if competitors else "major competitors"
@@ -162,7 +162,7 @@ Please gather data by:
 3. Use search_web to find market share data
 4. Use search_news for recent competitive news
 
-Be thorough - search for each competitor individually."""
+Focus on 2-3 searches for the most important competitive data."""
 
     elif research_type == "trend_analysis":
         prompt = f"""Analyze emerging trends in: {industry or query}
@@ -173,7 +173,7 @@ Please gather data by:
 3. Use search_news for recent industry changes
 4. Use search_web to find future predictions and forecasts
 
-Perform multiple searches to identify all major trends."""
+Perform 2-3 focused searches to identify the key trends."""
 
     else:  # full_report
         prompt = f"""Conduct comprehensive market research for a full report on: {query}
@@ -187,11 +187,14 @@ Gather data for:
 3. Industry trends - current and emerging (use search_web)
 4. Recent developments and news (use search_news)
 
-This is for a comprehensive report, so be thorough with 5-6 searches."""
+This is for a comprehensive report. Perform 3-4 focused searches covering the key areas."""
 
     try:
         # Run the agent
-        result = agent.invoke({"messages": [HumanMessage(content=prompt)]})
+        result = agent.invoke(
+            {"messages": [HumanMessage(content=prompt)]},
+            {"recursion_limit": 10},
+        )
 
         # Extract search results from the messages
         all_results = []

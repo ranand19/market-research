@@ -4,7 +4,7 @@ Coordinates the multi-agent workflow using LangGraph.
 """
 
 import logging
-from typing import Dict, Any, List, TypedDict, Annotated
+from typing import Dict, Any, Callable, List, Optional, TypedDict, Annotated
 from datetime import datetime
 
 from langgraph.graph import StateGraph, END
@@ -185,12 +185,27 @@ def should_continue(state: ResearchState) -> str:
     return "continue"
 
 
-def create_research_workflow(llm):
+def _wrap_node_with_callback(node_fn, agent_name, callback):
+    """Wrap a graph node function to emit progress events before and after execution."""
+    def wrapped(state):
+        callback({"agent": agent_name, "status": "started"})
+        try:
+            result = node_fn(state)
+            callback({"agent": agent_name, "status": "completed"})
+            return result
+        except Exception as e:
+            callback({"agent": agent_name, "status": "error", "error": str(e)})
+            raise
+    return wrapped
+
+
+def create_research_workflow(llm, progress_callback: Optional[Callable] = None):
     """
     Create the LangGraph workflow for market research.
 
     Args:
         llm: Language model instance
+        progress_callback: Optional callback for progress events
 
     Returns:
         Compiled LangGraph workflow
@@ -200,11 +215,24 @@ def create_research_workflow(llm):
     # Create the graph
     workflow = StateGraph(ResearchState)
 
+    # Create node functions
+    research_fn = create_research_node(llm)
+    analyze_fn = create_analysis_node(llm)
+    strategize_fn = create_strategy_node(llm)
+    compile_fn = compile_report_node
+
+    # Wrap with progress callback if provided
+    if progress_callback:
+        research_fn = _wrap_node_with_callback(research_fn, "research", progress_callback)
+        analyze_fn = _wrap_node_with_callback(analyze_fn, "analyze", progress_callback)
+        strategize_fn = _wrap_node_with_callback(strategize_fn, "strategize", progress_callback)
+        compile_fn = _wrap_node_with_callback(compile_fn, "compile", progress_callback)
+
     # Add nodes
-    workflow.add_node("research", create_research_node(llm))
-    workflow.add_node("analyze", create_analysis_node(llm))
-    workflow.add_node("strategize", create_strategy_node(llm))
-    workflow.add_node("compile", compile_report_node)
+    workflow.add_node("research", research_fn)
+    workflow.add_node("analyze", analyze_fn)
+    workflow.add_node("strategize", strategize_fn)
+    workflow.add_node("compile", compile_fn)
 
     # Set entry point
     workflow.set_entry_point("research")
@@ -244,7 +272,8 @@ def create_research_workflow(llm):
 
 
 def run_research(llm, query: str, research_type: str, company: str = None,
-                 competitors: List[str] = None, industry: str = None) -> Dict[str, Any]:
+                 competitors: List[str] = None, industry: str = None,
+                 progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
     """
     Run the complete research workflow.
 
@@ -255,6 +284,7 @@ def run_research(llm, query: str, research_type: str, company: str = None,
         company: Optional company name
         competitors: Optional list of competitors
         industry: Optional industry name
+        progress_callback: Optional callback for progress events
 
     Returns:
         Complete research results
@@ -262,7 +292,7 @@ def run_research(llm, query: str, research_type: str, company: str = None,
     logger.info(f"Starting research workflow: {query} ({research_type})")
 
     # Create the workflow
-    workflow = create_research_workflow(llm)
+    workflow = create_research_workflow(llm, progress_callback=progress_callback)
 
     # Initialize state
     initial_state: ResearchState = {

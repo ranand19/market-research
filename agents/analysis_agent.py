@@ -330,7 +330,7 @@ You have access to several analysis tools. Based on the research type and data a
 - For TREND ANALYSIS: Use identify_trends, analyze_market_segments, extract_key_statistics
 - For FULL REPORT: Use ALL available tools to build a comprehensive picture
 
-Be thorough - run 3-5 analyses to build a complete picture. Actually USE the tools."""
+Run 2-3 of the most relevant analyses. Actually USE the tools."""
 
     agent = create_react_agent(llm, tools, prompt=system_prompt)
     return agent
@@ -406,10 +406,13 @@ Use ALL available analysis tools:
 5. identify_trends
 6. extract_key_statistics
 
-Be thorough and use each tool."""
+Focus on the 3-4 most important tools for a comprehensive picture."""
 
     try:
-        result = agent.invoke({"messages": [HumanMessage(content=prompt)]})
+        result = agent.invoke(
+            {"messages": [HumanMessage(content=prompt)]},
+            {"recursion_limit": 10},
+        )
 
         # Extract analyses from tool messages
         analyses = {}

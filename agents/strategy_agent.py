@@ -339,7 +339,7 @@ Always:
 2. Provide actionable recommendations
 3. Address both opportunities and risks
 
-Be strategic and insightful. Actually USE the tools."""
+Be strategic and insightful. Use 2-3 of the most relevant tools."""
 
     agent = create_react_agent(llm, tools, prompt=system_prompt)
     return agent
@@ -406,10 +406,13 @@ Use ALL strategy tools:
 5. create_action_plan
 6. generate_executive_summary
 
-Provide complete strategic perspective."""
+Focus on the 3-4 most impactful tools for a complete strategic perspective."""
 
     try:
-        result = agent.invoke({"messages": [HumanMessage(content=prompt)]})
+        result = agent.invoke(
+            {"messages": [HumanMessage(content=prompt)]},
+            {"recursion_limit": 10},
+        )
 
         # Extract strategies from tool messages
         strategies = {}

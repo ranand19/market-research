@@ -27,6 +27,7 @@ import {
   Description as DescriptionIcon,
 } from '@mui/icons-material';
 import apiService from '../services/apiService';
+import TracePanel from './TracePanel';
 
 const ResearchInputScreen = ({ onResearchComplete }) => {
   const [query, setQuery] = useState('');
@@ -38,6 +39,7 @@ const ResearchInputScreen = ({ onResearchComplete }) => {
   const [researchTypes, setResearchTypes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [traceSteps, setTraceSteps] = useState({});
 
   useEffect(() => {
     loadResearchTypes();
@@ -73,6 +75,7 @@ const ResearchInputScreen = ({ onResearchComplete }) => {
 
     setLoading(true);
     setError(null);
+    setTraceSteps({});
 
     try {
       const researchData = {
@@ -83,10 +86,18 @@ const ResearchInputScreen = ({ onResearchComplete }) => {
         competitors: competitors.length > 0 ? competitors : null,
       };
 
-      const result = await apiService.executeResearch(researchData);
+      const result = await apiService.streamResearch(researchData, (event) => {
+        if (event.status === 'started') {
+          setTraceSteps((prev) => ({ ...prev, [event.agent]: 'running' }));
+        } else if (event.status === 'completed') {
+          setTraceSteps((prev) => ({ ...prev, [event.agent]: 'completed' }));
+        } else if (event.status === 'error') {
+          setTraceSteps((prev) => ({ ...prev, [event.agent]: 'error' }));
+        }
+      });
       onResearchComplete(result);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to execute research. Please try again.');
+      setError(err.message || 'Failed to execute research. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -295,6 +306,7 @@ const ResearchInputScreen = ({ onResearchComplete }) => {
           </Grid>
         </Paper>
       </Box>
+      <TracePanel steps={traceSteps} isActive={loading} />
     </Container>
   );
 };
