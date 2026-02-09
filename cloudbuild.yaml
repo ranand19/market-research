@@ -30,6 +30,8 @@ steps:
     - '10'
     - '--port'
     - '8080'
+    - '--timeout'
+    - '900'
     - '--set-env-vars'
     - 'LLM_MODEL=gpt-4,LLM_TEMPERATURE=0.7,LLM_MAX_TOKENS=2000'
     - '--update-secrets'

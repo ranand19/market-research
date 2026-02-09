@@ -7,7 +7,7 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 300000, // 5 minutes for complex multi-agent research queries
+  timeout: 900000, // 15 minutes for complex multi-agent research queries
 });
 
 // API service methods
