@@ -10,7 +10,8 @@ from duckduckgo_search import DDGS
 
 logger = logging.getLogger(__name__)
 
-# Shared delay to avoid DuckDuckGo rate-limiting across back-to-back calls
+# DuckDuckGo request timeout (seconds) and rate-limiting
+_DDG_TIMEOUT = 10
 _SEARCH_DELAY = 1.5  # seconds between DDG requests
 _last_search_time = 0.0
 
@@ -36,15 +37,15 @@ def web_search(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
         List of search results with title, link, and snippet
     """
     logger.info(f"Web search: {query}")
-    for attempt in range(3):
+    for attempt in range(2):
         try:
             _rate_limit()
-            with DDGS() as ddgs:
+            with DDGS(timeout=_DDG_TIMEOUT) as ddgs:
                 results = list(ddgs.text(query, max_results=max_results))
 
-            if not results and attempt < 2:
-                logger.warning(f"Web search returned 0 results (attempt {attempt + 1}), retrying...")
-                time.sleep(2 ** attempt)
+            if not results and attempt < 1:
+                logger.warning(f"Web search returned 0 results, retrying...")
+                time.sleep(2)
                 continue
 
             formatted_results = []
@@ -60,8 +61,8 @@ def web_search(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
             return formatted_results
         except Exception as e:
             logger.error(f"Web search failed (attempt {attempt + 1}): {e}")
-            if attempt < 2:
-                time.sleep(2 ** attempt)
+            if attempt < 1:
+                time.sleep(2)
                 continue
             return [{"error": str(e), "source": "web_search"}]
 
@@ -80,15 +81,15 @@ def news_search(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
         List of news articles with title, link, snippet, and date
     """
     logger.info(f"News search: {query}")
-    for attempt in range(3):
+    for attempt in range(2):
         try:
             _rate_limit()
-            with DDGS() as ddgs:
+            with DDGS(timeout=_DDG_TIMEOUT) as ddgs:
                 results = list(ddgs.news(query, max_results=max_results))
 
-            if not results and attempt < 2:
-                logger.warning(f"News search returned 0 results (attempt {attempt + 1}), retrying...")
-                time.sleep(2 ** attempt)
+            if not results and attempt < 1:
+                logger.warning(f"News search returned 0 results, retrying...")
+                time.sleep(2)
                 continue
 
             formatted_results = []
@@ -106,8 +107,8 @@ def news_search(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
             return formatted_results
         except Exception as e:
             logger.error(f"News search failed (attempt {attempt + 1}): {e}")
-            if attempt < 2:
-                time.sleep(2 ** attempt)
+            if attempt < 1:
+                time.sleep(2)
                 continue
             return [{"error": str(e), "source": "news_search"}]
 
