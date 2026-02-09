@@ -338,7 +338,7 @@ Run 2-3 of the most relevant analyses. Actually USE the tools."""
 
 def run_analysis_agent(llm, research_data: Dict[str, Any], research_type: str,
                        company: str = None, competitors: List[str] = None,
-                       industry: str = None) -> Dict[str, Any]:
+                       industry: str = None, callbacks=None) -> Dict[str, Any]:
     """
     Run the analysis agent to autonomously analyze gathered research data.
     """
@@ -409,9 +409,12 @@ Use ALL available analysis tools:
 Focus on the 3-4 most important tools for a comprehensive picture."""
 
     try:
+        invoke_config = {"recursion_limit": 10}
+        if callbacks:
+            invoke_config["callbacks"] = callbacks
         result = agent.invoke(
             {"messages": [HumanMessage(content=prompt)]},
-            {"recursion_limit": 10},
+            invoke_config,
         )
 
         # Extract analyses from tool messages

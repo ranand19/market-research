@@ -346,7 +346,8 @@ Be strategic and insightful. Use 2-3 of the most relevant tools."""
 
 
 def run_strategy_agent(llm, analysis_data: Dict[str, Any], query: str,
-                       company: str = None, research_type: str = "general") -> Dict[str, Any]:
+                       company: str = None, research_type: str = "general",
+                       callbacks=None) -> Dict[str, Any]:
     """
     Run the strategy agent to autonomously generate strategic outputs.
     """
@@ -409,9 +410,12 @@ Use ALL strategy tools:
 Focus on the 3-4 most impactful tools for a complete strategic perspective."""
 
     try:
+        invoke_config = {"recursion_limit": 10}
+        if callbacks:
+            invoke_config["callbacks"] = callbacks
         result = agent.invoke(
             {"messages": [HumanMessage(content=prompt)]},
-            {"recursion_limit": 10},
+            invoke_config,
         )
 
         # Extract strategies from tool messages

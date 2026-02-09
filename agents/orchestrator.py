@@ -7,6 +7,7 @@ import logging
 from typing import Dict, Any, Callable, List, Optional, TypedDict, Annotated
 from datetime import datetime
 
+from langchain_core.callbacks import BaseCallbackHandler
 from langgraph.graph import StateGraph, END
 
 from .research_agent import run_research_agent
@@ -39,11 +40,34 @@ class ResearchState(TypedDict):
     current_agent: str
 
 
-def create_research_node(llm):
+class IterationProgressHandler(BaseCallbackHandler):
+    """LangChain callback handler that reports tool-call progress."""
+
+    def __init__(self, agent_name: str, callback: Callable, max_iterations: int = 5):
+        self.agent_name = agent_name
+        self.callback = callback
+        self.iteration = 0
+        self.max_iterations = max_iterations
+
+    def on_tool_end(self, output, **kwargs):
+        self.iteration += 1
+        self.callback({
+            "agent": self.agent_name,
+            "status": "progress",
+            "iteration": self.iteration,
+            "max_iterations": self.max_iterations,
+        })
+
+
+def create_research_node(llm, progress_callback=None):
     """Create the research agent node."""
 
     def research_node(state: ResearchState) -> Dict[str, Any]:
         logger.info(f"Research node: Starting research for '{state['query']}'")
+
+        callbacks = None
+        if progress_callback:
+            callbacks = [IterationProgressHandler("research", progress_callback)]
 
         research_data = run_research_agent(
             llm=llm,
@@ -51,7 +75,8 @@ def create_research_node(llm):
             research_type=state["research_type"],
             company=state.get("company"),
             competitors=state.get("competitors", []),
-            industry=state.get("industry")
+            industry=state.get("industry"),
+            callbacks=callbacks,
         )
 
         if research_data.get("error"):
@@ -71,7 +96,7 @@ def create_research_node(llm):
     return research_node
 
 
-def create_analysis_node(llm):
+def create_analysis_node(llm, progress_callback=None):
     """Create the analysis agent node."""
 
     def analysis_node(state: ResearchState) -> Dict[str, Any]:
@@ -87,13 +112,18 @@ def create_analysis_node(llm):
                 "current_agent": "analysis"
             }
 
+        callbacks = None
+        if progress_callback:
+            callbacks = [IterationProgressHandler("analyze", progress_callback)]
+
         analysis_data = run_analysis_agent(
             llm=llm,
             research_data=research_data,
             research_type=state["research_type"],
             company=state.get("company"),
             competitors=state.get("competitors", []),
-            industry=state.get("industry")
+            industry=state.get("industry"),
+            callbacks=callbacks,
         )
 
         if analysis_data.get("error"):
@@ -113,7 +143,7 @@ def create_analysis_node(llm):
     return analysis_node
 
 
-def create_strategy_node(llm):
+def create_strategy_node(llm, progress_callback=None):
     """Create the strategy agent node."""
 
     def strategy_node(state: ResearchState) -> Dict[str, Any]:
@@ -129,12 +159,17 @@ def create_strategy_node(llm):
                 "current_agent": "strategy"
             }
 
+        callbacks = None
+        if progress_callback:
+            callbacks = [IterationProgressHandler("strategize", progress_callback)]
+
         strategy_data = run_strategy_agent(
             llm=llm,
             analysis_data=analysis_data,
             query=state["query"],
             company=state.get("company"),
-            research_type=state.get("research_type", "general")
+            research_type=state.get("research_type", "general"),
+            callbacks=callbacks,
         )
 
         if strategy_data.get("error"):
@@ -215,10 +250,10 @@ def create_research_workflow(llm, progress_callback: Optional[Callable] = None):
     # Create the graph
     workflow = StateGraph(ResearchState)
 
-    # Create node functions
-    research_fn = create_research_node(llm)
-    analyze_fn = create_analysis_node(llm)
-    strategize_fn = create_strategy_node(llm)
+    # Create node functions (pass callback for iteration-level progress)
+    research_fn = create_research_node(llm, progress_callback)
+    analyze_fn = create_analysis_node(llm, progress_callback)
+    strategize_fn = create_strategy_node(llm, progress_callback)
     compile_fn = compile_report_node
 
     # Wrap with progress callback if provided

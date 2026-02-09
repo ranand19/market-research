@@ -5,6 +5,7 @@ import {
   Typography,
   IconButton,
   CircularProgress,
+  LinearProgress,
 } from '@mui/material';
 import {
   CheckCircle as CheckCircleIcon,
@@ -94,14 +95,17 @@ const TracePanel = ({ steps, isActive }) => {
       {!minimized && (
         <Box sx={{ p: 1.5 }}>
           {STEPS.map((step, idx) => {
-            const status = steps[step.key] || 'pending';
+            const stepData = steps[step.key] || {};
+            const status = stepData.status || 'pending';
+            const iteration = stepData.iteration || 0;
+            const maxIterations = stepData.maxIterations || 0;
+            const progress = maxIterations > 0
+              ? Math.min(100, Math.round((iteration / maxIterations) * 100))
+              : 0;
             return (
               <Box
                 key={step.key}
                 sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1.5,
                   px: 1.5,
                   py: 1,
                   borderRadius: 1,
@@ -110,21 +114,42 @@ const TracePanel = ({ steps, isActive }) => {
                   transition: 'background-color 0.3s ease',
                 }}
               >
-                {statusIcon(status)}
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.3 }}>
-                    {step.label}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {status === 'running'
-                      ? step.description
-                      : status === 'completed'
-                      ? 'Done'
-                      : status === 'error'
-                      ? 'Failed'
-                      : 'Waiting'}
-                  </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  {statusIcon(status)}
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.3 }}>
+                      {step.label}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {status === 'running'
+                        ? (iteration > 0
+                          ? `${step.description} (${iteration}/${maxIterations})`
+                          : step.description)
+                        : status === 'completed'
+                        ? 'Done'
+                        : status === 'error'
+                        ? 'Failed'
+                        : 'Waiting'}
+                    </Typography>
+                  </Box>
                 </Box>
+                {status === 'running' && maxIterations > 0 && (
+                  <LinearProgress
+                    variant="determinate"
+                    value={progress}
+                    sx={{
+                      mt: 0.75,
+                      ml: 4.5,
+                      height: 4,
+                      borderRadius: 2,
+                      backgroundColor: 'rgba(0, 102, 204, 0.12)',
+                      '& .MuiLinearProgress-bar': {
+                        borderRadius: 2,
+                        backgroundColor: '#0066cc',
+                      },
+                    }}
+                  />
+                )}
               </Box>
             );
           })}

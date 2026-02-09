@@ -88,11 +88,24 @@ const ResearchInputScreen = ({ onResearchComplete }) => {
 
       const result = await apiService.streamResearch(researchData, (event) => {
         if (event.status === 'started') {
-          setTraceSteps((prev) => ({ ...prev, [event.agent]: 'running' }));
+          setTraceSteps((prev) => ({
+            ...prev,
+            [event.agent]: { status: 'running', iteration: 0, maxIterations: 0 },
+          }));
+        } else if (event.status === 'progress') {
+          setTraceSteps((prev) => ({
+            ...prev,
+            [event.agent]: {
+              ...(prev[event.agent] || {}),
+              status: 'running',
+              iteration: event.iteration,
+              maxIterations: event.max_iterations,
+            },
+          }));
         } else if (event.status === 'completed') {
-          setTraceSteps((prev) => ({ ...prev, [event.agent]: 'completed' }));
+          setTraceSteps((prev) => ({ ...prev, [event.agent]: { status: 'completed' } }));
         } else if (event.status === 'error') {
-          setTraceSteps((prev) => ({ ...prev, [event.agent]: 'error' }));
+          setTraceSteps((prev) => ({ ...prev, [event.agent]: { status: 'error' } }));
         }
       });
       onResearchComplete(result);

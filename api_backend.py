@@ -187,18 +187,18 @@ async def stream_research(request: ResearchRequest):
         )
 
     research_id = f"research_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    loop = asyncio.get_event_loop()
     queue: asyncio.Queue = asyncio.Queue()
 
     def progress_callback(event: dict):
         """Push progress events onto the async queue (thread-safe)."""
-        queue.put_nowait(event)
+        loop.call_soon_threadsafe(queue.put_nowait, event)
 
     async def event_generator():
         """Yield SSE events from the queue, then the final result."""
         from agents.orchestrator import run_research
 
         # Run the blocking workflow in a thread so it doesn't block the event loop
-        loop = asyncio.get_event_loop()
         result_future = loop.run_in_executor(
             None,
             lambda: run_research(
@@ -226,8 +226,17 @@ async def stream_research(request: ResearchRequest):
                         yield f"data: {json.dumps(event)}\n\n"
                     break
 
-        # Get the final result
-        result = await asyncio.wrap_future(result_future) if not result_future.done() else result_future.result()
+        # Get the final result (handle errors gracefully)
+        try:
+            result = result_future.result()
+        except Exception as e:
+            logger.error(f"Streaming workflow failed: {e}")
+            result = {
+                "status": "failed",
+                "error": str(e),
+                "results": {},
+                "summary": f"Research failed: {str(e)}",
+            }
 
         # Send final result event
         final_event = {

@@ -120,7 +120,8 @@ Be focused and efficient. Perform 2-3 targeted searches to gather the most impor
 
 
 def run_research_agent(llm, query: str, research_type: str, company: str = None,
-                       competitors: List[str] = None, industry: str = None) -> Dict[str, Any]:
+                       competitors: List[str] = None, industry: str = None,
+                       callbacks=None) -> Dict[str, Any]:
     """
     Run the research agent to gather data.
 
@@ -191,9 +192,12 @@ This is for a comprehensive report. Perform 3-4 focused searches covering the ke
 
     try:
         # Run the agent
+        invoke_config = {"recursion_limit": 10}
+        if callbacks:
+            invoke_config["callbacks"] = callbacks
         result = agent.invoke(
             {"messages": [HumanMessage(content=prompt)]},
-            {"recursion_limit": 10},
+            invoke_config,
         )
 
         # Extract search results from the messages
